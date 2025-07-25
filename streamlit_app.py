@@ -5,8 +5,13 @@ from google.oauth2.service_account import Credentials
 import datetime
 
 # === Google Sheets Setup ===
+from google.oauth2.service_account import Credentials
+
 def get_creds():
-    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"  # Needed to read/write sheets or use file access
+    ]
     return Credentials.from_service_account_info(st.secrets["google"], scopes=scopes)
 
 agcm = AsyncioGspreadClientManager(get_creds)
