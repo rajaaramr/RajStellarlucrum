@@ -6,7 +6,8 @@ import datetime
 
 # === Google Sheets Setup ===
 def get_creds():
-    return Credentials.from_service_account_info(st.secrets["google"])
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    return Credentials.from_service_account_info(st.secrets["google"], scopes=scopes)
 
 agcm = AsyncioGspreadClientManager(get_creds)
 
