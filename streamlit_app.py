@@ -8,9 +8,10 @@ import json
 
 # ✅ Properly define get_creds to load from st.secrets
 def get_creds():
-    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    credentials_dict = st.secrets["gcp_service_account"]
-    return ServiceAccountCredentials.from_json_keyfile_dict(json.loads(credentials_dict.to_json()), scope)
+    return Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"],
+        scopes=["https://www.googleapis.com/auth/spreadsheets"]
+    )
 
 # ✅ Create the async client manager correctly
 agcm = gspread_asyncio.AsyncioGspreadClientManager(get_creds)
