@@ -31,7 +31,8 @@ def get_option_data():
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     return [
         now,                        # Timestamp
-        22450,                      # Spot Price
+        "NIFTY",  		    # Symbol (B) ✅ ADD THIS	
+	22450,                      # Spot Price
         22520,                      # Futures Price
         153250,                     # Futures OI
         1200,                       # Futures OI Δ
@@ -43,8 +44,9 @@ def get_option_data():
         200,                        # PE OI Δ
         465,                        # Straddle Price
         13.8,                       # IV %
-        "Put Writing (Bullish)",   # Inference
-        "Bullish Confirmation"     # Market Sentiment
+        "Put Writing (Bullish)",    # Inference (O)
+        "Only PE Change",           # Option Writer Bias (P) ✅ ADD
+        "Bullish Confirmation"      # Market Sentiment (Q) ✅ ADD
     ]
 
 # ---- 🗂️ Access Sheets ----
