@@ -4,7 +4,7 @@ from gspread_asyncio import AsyncioGspreadClientManager
 from google.oauth2.service_account import Credentials
 import datetime
 
-# === Google Sheets Credentials from Streamlit Secrets ===
+# === Google Sheets Setup ===
 def get_creds():
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
@@ -12,59 +12,57 @@ def get_creds():
     ]
     return Credentials.from_service_account_info(st.secrets["google"], scopes=scopes)
 
-# === Setup gspread_asyncio client ===
 agcm = AsyncioGspreadClientManager(get_creds)
 
-# === Access Sheet ===
-async def get_gsheet():
+async def get_sheets():
     try:
         client = await agcm.authorize()
-        spreadsheet = await client.open("RajTask7_OptionData")
-        sheet = await spreadsheet.worksheet("Sheet1")  # Make sure your tab is named 'Sheet1'
-        return sheet
+        gsheet = await client.open("RajTask7_OptionData")
+        sheet1 = gsheet.worksheet("Sheet1")
+        history_sheet = gsheet.worksheet("TrendHistory")
+        return sheet1, history_sheet
     except Exception as e:
         st.error(f"⚠️ Error accessing Google Sheets: {e}")
-        return None
+        return None, None
 
-# === Option Data Fetcher (you can later pull real-time data here) ===
+# === Dummy Data Fetcher (Replace with real logic) ===
 def fetch_option_data():
     return {
-        "timestamp": str(datetime.datetime.now()),
-        "stock_name": "NIFTY",  # Future enhancement: dynamic symbol
-        "underlying_price": 22200,
-        "future_price": 22230,
-        "CE_price": 140.25,
-        "PE_price": 135.70,
-        "IV": 21.4,
-        "CE_OI": 32000,
-        "PE_OI": 38000,
-        "Fut_OI": 590000
+        "timestamp": str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
+        "price": 23450.75,
+        "fut_price": 23480.20,
+        "fut_oi": 1152000,
+        "delta_fut_oi": 21000,
+        "ce_price": 120.5,
+        "pe_price": 95.25,
+        "ce_oi": 875000,
+        "pe_oi": 720000,
+        "delta_ce_oi": 18500,
+        "delta_pe_oi": 11000,
+        "iv": 16.7,
+        "straddle": 215.75,
+        "inference": "Long Buildup",
+        "writer_bias": "Put Writing (Bullish)",
+        "sentiment": "Bullish Confirmation"
     }
 
-# === UI Layout ===
-st.title("📊 RajTask 7 – Option Analytics HUD")
-st.markdown("Click to fetch CE/PE prices, OI, IV, and Futures reference into Google Sheets.")
+# === Streamlit App ===
+st.title("RajTask 7 – Option Analytics Logger")
+st.markdown("Click below to fetch Option Data and log it into **Sheet1** and **TrendHistory**.")
 
-# === Button Trigger ===
 if st.button("📥 Fetch Option Data"):
     data = fetch_option_data()
-
-    # Attempt writing to sheet
     try:
-        sheet = asyncio.run(get_gsheet())
-        if sheet:
-            sheet.append_row([
-                data["timestamp"],
-                data["stock_name"],
-                data["underlying_price"],
-                data["future_price"],
-                data["CE_price"],
-                data["PE_price"],
-                data["IV"],
-                data["CE_OI"],
-                data["PE_OI"],
-                data["Fut_OI"]
-            ])
-            st.success("✅ Data successfully logged to Google Sheets.")
+        sheet1, history_sheet = asyncio.run(get_sheets())
+        if sheet1 and history_sheet:
+            row = [
+                data["timestamp"], data["price"], data["fut_price"], data["fut_oi"], data["delta_fut_oi"],
+                data["ce_price"], data["pe_price"], data["ce_oi"], data["pe_oi"],
+                data["delta_ce_oi"], data["delta_pe_oi"], data["iv"], data["straddle"],
+                data["inference"], data["writer_bias"], data["sentiment"]
+            ]
+            sheet1.append_row(row)
+            history_sheet.append_row(row)
+            st.success("✅ Logged data to both Sheet1 and TrendHistory.")
     except Exception as e:
-        st.error(f"❌ Error writing to Google Sheets:\n\n{e}")
+        st.error(f"❌ Error logging to sheets:\n\n{e}")
