@@ -5,12 +5,21 @@ import nest_asyncio
 import gspread_asyncio
 from oauth2client.service_account import ServiceAccountCredentials
 
+# ✅ Properly define get_creds to load from st.secrets
+def get_creds():
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    credentials_dict = st.secrets["gcp_service_account"]
+    return ServiceAccountCredentials.from_json_keyfile_dict(json.loads(credentials_dict.to_json()), scope)
+
+# ✅ Create the async client manager correctly
+agcm = gspread_asyncio.AsyncioGspreadClientManager(get_creds)
+
+
 # Required for running async loops in Streamlit
 nest_asyncio.apply()
 
+
 # ---- Google Sheet Auth Setup ----
-import json
-from oauth2client.service_account import ServiceAccountCredentials
 
 def get_gspread_client():
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
