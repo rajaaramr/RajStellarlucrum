@@ -9,12 +9,15 @@ from oauth2client.service_account import ServiceAccountCredentials
 nest_asyncio.apply()
 
 # ---- Google Sheet Auth Setup ----
-def get_creds():
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    return ServiceAccountCredentials.from_json_keyfile_name("service_account.json", scope)
+dimport json
+from oauth2client.service_account import ServiceAccountCredentials
+
+def get_gspread_client():
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    credentials_dict = st.secrets["gcp_service_account"]
+    credentials = ServiceAccountCredentials.from_json_keyfile_dict(json.loads(credentials_dict.to_json()), scope)
+    return gspread_asyncio.AsyncioGspreadClientManager(lambda: credentials)
+
 
 agcm = gspread_asyncio.AsyncioGspreadClientManager(get_creds)
 
