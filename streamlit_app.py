@@ -1,76 +1,69 @@
 import streamlit as st
-from datetime import datetime
-import pandas as pd
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+import asyncio
+from gspread_asyncio import AsyncioGspreadClientManager
+from google.oauth2.service_account import Credentials
+import datetime
 
-# === CONFIGURATION ===
-SHEET_NAME = "RajTask7_OptionData"
-SYMBOL = "NIFTY"  # Change this if you're processing multiple symbols dynamically
+# === Google Sheets Credentials from Streamlit Secrets ===
+def get_creds():
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    return Credentials.from_service_account_info(st.secrets["google"], scopes=scopes)
 
-# === GOOGLE SHEET SETUP ===
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("gdrive_secret.json", scope)
-client = gspread.authorize(creds)
-sheet = client.open(SHEET_NAME).sheet1
+# === Setup gspread_asyncio client ===
+agcm = AsyncioGspreadClientManager(get_creds)
 
-# === STREAMLIT SETUP ===
-st.title("RajTask 7 – Option Analytics HUD")
-st.markdown("Click the button below to fetch CE/PE and IV, and log it to Google Sheets.")
-btn = st.button("📥 Fetch Option Data")
+# === Access Sheet ===
+async def get_gsheet():
+    try:
+        client = await agcm.authorize()
+        sheet = (await client.open("RajTask7_OptionData")).sheet1
+        return sheet
+    except Exception as e:
+        st.error(f"⚠️ Error accessing Google Sheets: {e}")
+        return None
 
-# === MOCK FETCH FUNCTIONS (Replace with real API calls) ===
+# === Option Data Fetcher (you can later pull real-time data here) ===
 def fetch_option_data():
     return {
-        "futures_price": 22475,
-        "futures_oi": 167000,
-        "futures_oi_delta": -3000,
-        "ce_price": 120,
-        "ce_oi": 110000,
-        "ce_oi_delta": -2500,
-        "pe_price": 130,
-        "pe_oi": 140000,
-        "pe_oi_delta": 3000,
-        "iv": 13.5
+        "timestamp": str(datetime.datetime.now()),
+        "stock_name": "NIFTY",  # Future enhancement: dynamic symbol
+        "underlying_price": 22200,
+        "future_price": 22230,
+        "CE_price": 140.25,
+        "PE_price": 135.70,
+        "IV": 21.4,
+        "CE_OI": 32000,
+        "PE_OI": 38000,
+        "Fut_OI": 590000
     }
 
-def compute_inference(ce_price, pe_price):
-    if ce_price > 140 and pe_price > 140:
-        return "Straddle High", "Volatile", "Writers Cautious"
-    elif ce_price < 80 and pe_price < 80:
-        return "Price Flat", "Only PE Change Mixed", "No Clear Bias"
-    elif ce_price < 80 and pe_price > 120:
-        return "PE Rising", "Bearish Bias", "Put Writers Aggressive"
-    else:
-        return "Price Flat", "Only PE Change Mixed", "No Clear Bias"
+# === UI Layout ===
+st.title("📊 RajTask 7 – Option Analytics HUD")
+st.markdown("Click to fetch CE/PE prices, OI, IV, and Futures reference into Google Sheets.")
 
-# === MAIN ACTION ===
-if btn:
+# === Button Trigger ===
+if st.button("📥 Fetch Option Data"):
     data = fetch_option_data()
 
-    # === Derived Metrics ===
-    straddle_price = data["ce_price"] + data["pe_price"]
-    inference, bias, sentiment = compute_inference(data["ce_price"], data["pe_price"])
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    row = [
-        SYMBOL,
-        timestamp,
-        data["futures_price"],
-        data["futures_oi"],
-        data["futures_oi_delta"],
-        data["ce_price"],
-        data["ce_oi"],
-        data["ce_oi_delta"],
-        data["pe_price"],
-        data["pe_oi"],
-        data["pe_oi_delta"],
-        straddle_price,
-        data["iv"],
-        inference,
-        bias,
-        sentiment
-    ]
-
-    sheet.append_row(row)
-    st.success("✅ Data successfully logged to Google Sheets.")
+    # Attempt writing to sheet
+    try:
+        sheet = asyncio.run(get_gsheet())
+        if sheet:
+            sheet.append_row([
+                data["timestamp"],
+                data["stock_name"],
+                data["underlying_price"],
+                data["future_price"],
+                data["CE_price"],
+                data["PE_price"],
+                data["IV"],
+                data["CE_OI"],
+                data["PE_OI"],
+                data["Fut_OI"]
+            ])
+            st.success("✅ Data successfully logged to Google Sheets.")
+    except Exception as e:
+        st.error(f"❌ Error writing to Google Sheets:\n\n{e}")
