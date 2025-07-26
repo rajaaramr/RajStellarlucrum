@@ -18,8 +18,9 @@ agcm = AsyncioGspreadClientManager(get_creds)
 # === Access Sheet ===
 async def get_gsheet():
     try:
+        client = await agcm.authorize()
         spreadsheet = await client.open("RajTask7_OptionData")
-	sheet = await spreadsheet.worksheet("Sheet1")  # Make sure your tab is named 'Sheet1'
+        sheet = await spreadsheet.worksheet("Sheet1")  # Make sure your tab is named 'Sheet1'
         return sheet
     except Exception as e:
         st.error(f"⚠️ Error accessing Google Sheets: {e}")
