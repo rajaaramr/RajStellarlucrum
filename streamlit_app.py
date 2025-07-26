@@ -9,7 +9,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 nest_asyncio.apply()
 
 # ---- Google Sheet Auth Setup ----
-dimport json
+import json
 from oauth2client.service_account import ServiceAccountCredentials
 
 def get_gspread_client():
