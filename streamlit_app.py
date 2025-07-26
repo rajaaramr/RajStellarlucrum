@@ -4,6 +4,8 @@ import asyncio
 import nest_asyncio
 import gspread_asyncio
 from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
+
 import json
 
 # ✅ Properly define get_creds to load from st.secrets
