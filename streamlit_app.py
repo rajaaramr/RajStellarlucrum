@@ -174,3 +174,8 @@ async def append_data_to_sheets():
         st.success("✅ Logged to Google Sheets.")
     except Exception as history_error:
         st.error(f"❌ Failed to update TrendHistory: {history_error}")
+
+# ✅ Run on button click
+if st.session_state.access_token:
+    if st.button("📥 Fetch Option Data"):
+        asyncio.run(append_data_to_sheets())
