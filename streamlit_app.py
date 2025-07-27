@@ -144,6 +144,11 @@ async def get_sheets():
         return None, None
 
 # ✅ Append to Sheets
+# ✅ Clean data to avoid NoneType or unsupported values
+def clean_data(data_row):
+    return [str(x) if x is not None else "" for x in data_row]
+
+# ✅ Append to Google Sheets
 async def append_data_to_sheets():
     sheet1, history_sheet = await get_sheets()
     if not sheet1 or not history_sheet:
@@ -153,15 +158,19 @@ async def append_data_to_sheets():
     if not data:
         return
 
-    try:
-        await sheet1.append_row(data)
-        snapshot_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        await history_sheet.append_row([snapshot_time] + data[1:])  # Avoid duplicating timestamp
-        st.success("✅ Logged to Google Sheets.")
-    except Exception as e:
-        st.error(f"❌ Logging failed: {e}")
+    cleaned_data = clean_data(data)
+    snapshot_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    history_row = [snapshot_time] + cleaned_data[1:]
 
-# ✅ Run on button click
-if st.session_state.access_token:
-    if st.button("📥 Fetch Option Data"):
-        asyncio.run(append_data_to_sheets())
+    try:
+        # Attempt to write to Sheet1
+        await sheet1.append_row(cleaned_data)
+    except Exception as sheet1_error:
+        st.error(f"⚠️ Failed to update Sheet1: {sheet1_error}")
+
+    try:
+        # Write to TrendHistory
+        await history_sheet.append_row(history_row)
+        st.success("✅ Logged to Google Sheets.")
+    except Exception as history_error:
+        st.error(f"❌ Failed to update TrendHistory: {history_error}")
