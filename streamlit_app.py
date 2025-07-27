@@ -5,6 +5,7 @@ import nest_asyncio
 import gspread_asyncio
 from google.oauth2.service_account import Credentials
 from kiteconnect import KiteConnect
+from dateutil import parser
 import os
 
 # Required to enable nested loops
@@ -72,14 +73,20 @@ def get_option_data_live(kite, user_symbol):
         symbol = get_zerodha_symbol(user_symbol)
         ltp_data = kite.ltp(symbol)
         spot_price = ltp_data[symbol]['last_price']
-        expiry = kite.instruments("NSE")
-        expiry = sorted(list(set([i["expiry"] for i in expiry if i["tradingsymbol"].startswith(user_symbol)])))[0]
+        
+
+	instruments = kite.instruments("NFO")
+	expiries = sorted(list(set([i["expiry"] for i in instruments if i["name"] == user_symbol and i["segment"] == "NFO-OPT"])))
+	expiry_str = expiries[0]
+	expiry_date = parser.parse(expiry_str) if isinstance(expiry_str, str) else expiry_str
+
 
         # Get CE/PE near ATM data (rounded ATM strike)
         atm_strike = round(spot_price / 100) * 100
-        ce_symbol = f"NFO:{user_symbol}{expiry.strftime('%y%b').upper()}{atm_strike}CE"
-        pe_symbol = f"NFO:{user_symbol}{expiry.strftime('%y%b').upper()}{atm_strike}PE"
-        fut_symbol = f"NFO:{user_symbol}{expiry.strftime('%y%b').upper()}FUT"
+        ce_symbol = f"NFO:{user_symbol}{expiry_date.strftime('%y%b').upper()}{atm_strike}CE"
+	pe_symbol = f"NFO:{user_symbol}{expiry_date.strftime('%y%b').upper()}{atm_strike}PE"
+	fut_symbol = f"NFO:{user_symbol}{expiry_date.strftime('%y%b').upper()}FUT"
+
 
         quote = kite.quote([ce_symbol, pe_symbol, fut_symbol])
 
