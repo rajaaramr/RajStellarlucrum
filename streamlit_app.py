@@ -68,15 +68,16 @@ async def append_data_to_sheets():
         return
 
     data = get_option_data()
-    
-    # ✅ Debug output
-    st.write("🧪 Row Preview:", data)
-    st.write("✅ Row Length:", len(data))  # Expect 17
 
     try:
-        await sheet1.append_row(data, value_input_option="USER_ENTERED")
-        await history_sheet.append_row(data, value_input_option="USER_ENTERED")
-        st.success("✅ Data successfully logged to Google Sheets.")
+        # ✅ Append to live sheet
+        await sheet1.append_row(data)
+
+        # ✅ Add timestamp snapshot to history
+        snapshot = [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")] + data
+        await history_sheet.append_row(snapshot)
+
+        st.success("✅ Data successfully logged to Google Sheets and archived.")
     except Exception as e:
         st.error(f"❌ Error logging to sheets: {e}")
 
