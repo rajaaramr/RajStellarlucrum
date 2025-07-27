@@ -4,3 +4,5 @@ gspread_asyncio
 google-auth
 nest_asyncio
 oauth2client==4.1.3
+kiteconnect
+pandas
