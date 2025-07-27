@@ -141,12 +141,15 @@ async def append_data_to_sheets():
     sheet1, history_sheet = await get_sheets()
     if not sheet1 or not history_sheet:
         return
+
     data = get_option_data_live(kite, user_symbol)
     if not data:
         return
+
     try:
         await sheet1.append_row(data)
-        await history_sheet.append_row([datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")] + data)
+        snapshot_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        await history_sheet.append_row([snapshot_time] + data[1:])  # Avoid duplicating timestamp
         st.success("✅ Logged to Google Sheets.")
     except Exception as e:
         st.error(f"❌ Logging failed: {e}")
