@@ -5,13 +5,12 @@ import nest_asyncio
 import gspread_asyncio
 from google.oauth2.service_account import Credentials
 from kiteconnect import KiteConnect
-from dateutil import parser
 import os
 
-# Required to enable nested loops
+# ✅ Allow nested loops (needed for Streamlit + asyncio)
 nest_asyncio.apply()
 
-# --- Google Sheets Credentials ---
+# ✅ Google Sheets authentication
 def get_creds():
     return Credentials.from_service_account_info(
         st.secrets["gcp_service_account"],
@@ -23,41 +22,44 @@ def get_creds():
 
 agcm = gspread_asyncio.AsyncioGspreadClientManager(get_creds)
 
-# --- Zerodha API Secrets ---
+# ✅ Zerodha credentials from secrets
 Z_API_KEY = st.secrets["zerodha"]["api_key"]
 Z_API_SECRET = st.secrets["zerodha"]["api_secret"]
 Z_REDIRECT_URL = st.secrets["zerodha"]["redirect_url"]
 
-# --- Session Init ---
+# ✅ Session state for access token
 if "access_token" not in st.session_state:
     st.session_state.access_token = None
 
 kite = KiteConnect(api_key=Z_API_KEY)
 
-# --- Streamlit UI ---
+# ✅ Streamlit UI setup
 st.set_page_config(page_title="RajTask 7 – Option Analytics Logger")
 st.title("📊 RajTask 7 – Option Analytics Logger")
 st.write("Click below to fetch Option Data and log it into **Sheet1** and **TrendHistory**.")
 
+# ✅ Symbol input
 user_symbol = st.text_input("Enter Stock Symbol or Index (e.g., NIFTY, RELIANCE, SBIN)", value="NIFTY").upper()
 
-# --- Zerodha Login ---
+# ✅ Zerodha login
 if not st.session_state.access_token:
     login_url = kite.login_url()
-    st.markdown(f"[🔐 Login to Zerodha]({login_url})", unsafe_allow_html=True)
-    request_token = st.text_input("Paste the Request Token from URL after login:")
+    st.write("🔐 Click below to login to Zerodha and get the Request Token:")
+    st.markdown(f"[Login to Zerodha]({login_url})", unsafe_allow_html=True)
+    request_token = st.text_input("Paste the Request Token here:")
+
     if request_token:
         try:
             session_data = kite.generate_session(request_token, api_secret=Z_API_SECRET)
             kite.set_access_token(session_data["access_token"])
             st.session_state.access_token = session_data["access_token"]
-            st.success("✅ Zerodha login successful.")
+            st.success("✅ Zerodha login successful. You can now fetch live data.")
         except Exception as e:
-            st.error(f"❌ Login failed: {e}")
+            st.error(f"❌ Failed to authenticate: {e}")
 else:
     kite.set_access_token(st.session_state.access_token)
 
-# --- Symbol Mapper ---
+# ✅ Symbol mapping
 def get_zerodha_symbol(user_symbol: str) -> str:
     index_map = {
         "NIFTY": "NSE:NIFTY 50",
@@ -67,64 +69,62 @@ def get_zerodha_symbol(user_symbol: str) -> str:
     }
     return index_map.get(user_symbol, f"NSE:{user_symbol}")
 
-# --- Real Option & Futures Data Fetch ---
+# ✅ Fetch live option data from Zerodha
 def get_option_data_live(kite, user_symbol):
     try:
-        symbol = get_zerodha_symbol(user_symbol)
-        ltp_data = kite.ltp(symbol)
-        spot_price = ltp_data[symbol]['last_price']
-        
+        instrument = get_zerodha_symbol(user_symbol)
+        quote = kite.ltp(instrument)
+        if instrument not in quote:
+            st.error(f"⚠️ Symbol not found: {instrument}")
+            return None
 
-	instruments = kite.instruments("NFO")
-	expiries = sorted(list(set([i["expiry"] for i in instruments if i["name"] == user_symbol and i["segment"] == "NFO-OPT"])))
-	expiry_str = expiries[0]
-	expiry_date = parser.parse(expiry_str) if isinstance(expiry_str, str) else expiry_str
+        spot_price = quote[instrument]["last_price"]
+        instruments = kite.instruments("NFO")
 
+        # Filter CE and PE
+        ce, pe = None, None
+        for inst in instruments:
+            if inst["name"] == user_symbol and inst["instrument_type"] == "CE" and inst["strike"] >= spot_price:
+                ce = inst
+            if inst["name"] == user_symbol and inst["instrument_type"] == "PE" and inst["strike"] <= spot_price:
+                pe = inst
+            if ce and pe:
+                break
 
-        # Get CE/PE near ATM data (rounded ATM strike)
-        atm_strike = round(spot_price / 100) * 100
-        ce_symbol = f"NFO:{user_symbol}{expiry_date.strftime('%y%b').upper()}{atm_strike}CE"
-	pe_symbol = f"NFO:{user_symbol}{expiry_date.strftime('%y%b').upper()}{atm_strike}PE"
-	fut_symbol = f"NFO:{user_symbol}{expiry_date.strftime('%y%b').upper()}FUT"
+        if not ce or not pe:
+            st.error("⚠️ No matching CE/PE option found.")
+            return None
 
+        ce_ltp = kite.ltp(f"NFO:{ce['tradingsymbol']}")[f"NFO:{ce['tradingsymbol']}"]
+        pe_ltp = kite.ltp(f"NFO:{pe['tradingsymbol']}")[f"NFO:{pe['tradingsymbol']}"]
 
-        quote = kite.quote([ce_symbol, pe_symbol, fut_symbol])
-
-        ce_price = quote[ce_symbol]['last_price']
-        pe_price = quote[pe_symbol]['last_price']
-        ce_oi = quote[ce_symbol]['oi']
-        pe_oi = quote[pe_symbol]['oi']
-        ce_oi_chg = quote[ce_symbol]['oi_day_high'] - quote[ce_symbol]['oi_day_low']
-        pe_oi_chg = quote[pe_symbol]['oi_day_high'] - quote[pe_symbol]['oi_day_low']
-        fut_price = quote[fut_symbol]['last_price']
-        fut_oi = quote[fut_symbol]['oi']
-        fut_oi_chg = quote[fut_symbol]['oi_day_high'] - quote[fut_symbol]['oi_day_low']
-        iv = quote[ce_symbol].get("implied_volatility", 0)
+        fut_inst = next((i for i in instruments if i["name"] == user_symbol and i["instrument_type"] == "FUT"), None)
+        fut_quote = kite.ltp(f"NFO:{fut_inst['tradingsymbol']}")[f"NFO:{fut_inst['tradingsymbol']}"] if fut_inst else {}
 
         return [
             datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             user_symbol,
             spot_price,
-            fut_price,
-            fut_oi,
-            fut_oi_chg,
-            ce_price,
-            ce_oi,
-            ce_oi_chg,
-            pe_price,
-            pe_oi,
-            pe_oi_chg,
-            ce_price + pe_price,     # Straddle Price
-            iv,
-            "Put Writing" if pe_oi_chg > ce_oi_chg else "Call Writing",
-            "Only PE Change" if pe_oi_chg > 1.5 * ce_oi_chg else "Mixed",
-            "Bullish Confirmation" if pe_oi_chg > ce_oi_chg else "Neutral"
+            fut_quote.get("last_price", 0),
+            fut_quote.get("oi", 0),
+            fut_quote.get("oi_day_high", 0),
+            ce_ltp["last_price"],
+            ce_ltp["oi"],
+            ce_ltp["oi_day_high"],
+            pe_ltp["last_price"],
+            pe_ltp["oi"],
+            pe_ltp["oi_day_high"],
+            ce_ltp["last_price"] + pe_ltp["last_price"],
+            13.8,  # Replace with actual IV logic if available
+            "Put Writing" if pe_ltp["oi_day_high"] > ce_ltp["oi_day_high"] else "Call Writing",
+            "Only PE Change" if pe_ltp["oi_day_high"] > 1.5 * ce_ltp["oi_day_high"] else "Mixed",
+            "Bullish Confirmation" if pe_ltp["oi_day_high"] > ce_ltp["oi_day_high"] else "Neutral"
         ]
     except Exception as e:
-        st.error(f"❌ Error: {e}")
+        st.error(f"❌ Error fetching option data: {e}")
         return None
 
-# --- Google Sheet Access ---
+# ✅ Get Google Sheets references
 async def get_sheets():
     try:
         client = await agcm.authorize()
@@ -133,10 +133,10 @@ async def get_sheets():
         history_sheet = await gsheet.worksheet("TrendHistory")
         return sheet1, history_sheet
     except Exception as e:
-        st.error(f"❌ Sheet access failed: {e}")
+        st.error(f"⚠️ Error accessing Google Sheets: {e}")
         return None, None
 
-# --- Data Append Logic ---
+# ✅ Append to Sheets
 async def append_data_to_sheets():
     sheet1, history_sheet = await get_sheets()
     if not sheet1 or not history_sheet:
@@ -154,7 +154,7 @@ async def append_data_to_sheets():
     except Exception as e:
         st.error(f"❌ Logging failed: {e}")
 
-# --- Button Action ---
+# ✅ Run on button click
 if st.session_state.access_token:
     if st.button("📥 Fetch Option Data"):
         asyncio.run(append_data_to_sheets())
