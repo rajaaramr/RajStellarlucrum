@@ -38,6 +38,26 @@ st.set_page_config(page_title="RajTask 7 – Option Analytics Logger")
 st.title("📊 RajTask 7 – Option Analytics Logger")
 st.write("Click below to fetch Option Data and log it into **Sheet1** and **TrendHistory**.")
 
+# --- Watchlist Input & Toggle ---
+st.subheader("📋 Watched Symbols")
+
+max_symbols = 5
+watchlist = []
+schedule_flags = []
+
+for i in range(max_symbols):
+    cols = st.columns([2, 1])
+    symbol = cols[0].text_input(f"Symbol {i+1}", value="", key=f"symbol_{i}").upper()
+    run_flag = cols[1].checkbox("Start", key=f"start_{i}", value=False)
+    if symbol and run_flag:
+        watchlist.append(symbol)
+        schedule_flags.append(True)
+    else:
+        schedule_flags.append(False)
+
+st.write("✅ Only active stocks will be scheduled every 5 mins.")
+
+
 # ✅ Symbol input
 user_symbol = st.text_input("Enter Stock Symbol or Index (e.g., NIFTY, RELIANCE, SBIN)", value="NIFTY").upper()
 
